@@ -87,6 +87,13 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 	return unmarshal(in, out, false)
 }
 
+// UnmarshalLenient is like Unmarshal but silently replaces unresolved anchor
+// references with null instead of returning an error. This is useful when
+// parsing files that reference anchors defined in other files.
+func UnmarshalLenient(in []byte, out interface{}) (err error) {
+	return unmarshalLenient(in, out, false)
+}
+
 // A Decoder reads and decodes YAML values from an input stream.
 type Decoder struct {
 	parser      *parser
@@ -152,9 +159,18 @@ func (n *Node) Decode(v interface{}) (err error) {
 }
 
 func unmarshal(in []byte, out interface{}, strict bool) (err error) {
+	return unmarshalWithParser(in, out, strict, false)
+}
+
+func unmarshalLenient(in []byte, out interface{}, strict bool) (err error) {
+	return unmarshalWithParser(in, out, strict, true)
+}
+
+func unmarshalWithParser(in []byte, out interface{}, strict, lenientAliases bool) (err error) {
 	defer handleErr(&err)
 	d := newDecoder()
 	p := newParser(in)
+	p.lenientAliases = lenientAliases
 	defer p.destroy()
 	node := p.parse()
 	if node != nil {

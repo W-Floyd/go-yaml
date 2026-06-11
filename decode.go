@@ -30,12 +30,13 @@ import (
 // Parser, produces a node tree out of a libyaml event stream.
 
 type parser struct {
-	parser   yaml_parser_t
-	event    yaml_event_t
-	doc      *Node
-	anchors  map[string]*Node
-	doneInit bool
-	textless bool
+	parser         yaml_parser_t
+	event          yaml_event_t
+	doc            *Node
+	anchors        map[string]*Node
+	doneInit       bool
+	textless       bool
+	lenientAliases bool // if true, unknown anchors produce a null node instead of an error
 }
 
 func newParser(b []byte) *parser {
@@ -215,6 +216,11 @@ func (p *parser) alias() *Node {
 	n := p.node(AliasNode, "", "", string(p.event.anchor))
 	n.Alias = p.anchors[n.Value]
 	if n.Alias == nil {
+		if p.lenientAliases {
+			null := p.node(ScalarNode, "null", "!!null", "")
+			p.expect(yaml_ALIAS_EVENT)
+			return null
+		}
 		failf("unknown anchor '%s' referenced", n.Value)
 	}
 	p.expect(yaml_ALIAS_EVENT)

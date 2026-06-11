@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	"go.yaml.in/yaml/v3"
+	"github.com/modopayments/go-yaml/v3"
 )
 
 // An example showing how to unmarshal embedded

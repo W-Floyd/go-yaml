@@ -6,7 +6,7 @@ import (
 
 	. "gopkg.in/check.v1"
 
-	"go.yaml.in/yaml/v3"
+	"github.com/modopayments/go-yaml/v3"
 )
 
 var limitTests = []struct {

@@ -94,6 +94,19 @@ func UnmarshalLenient(in []byte, out interface{}) (err error) {
 	return unmarshalLenient(in, out, false)
 }
 
+// UnmarshalStubAliases is like Unmarshal but keeps every alias reference as an
+// unresolved AliasNode (Alias field is nil, Value holds the anchor name).
+// Neither in-file nor cross-file anchors are followed. The resulting Node tree
+// can be re-encoded without modification; the encoder emits *anchorName using
+// only node.Value, so nil Alias is safe.
+//
+// Use this when you need a lossless round-trip of YAML that contains cross-file
+// anchor references, such as composition files that merge anchors defined in
+// sibling documents.
+func UnmarshalStubAliases(in []byte, out interface{}) (err error) {
+	return unmarshalWithParser(in, out, false, false, true)
+}
+
 // A Decoder reads and decodes YAML values from an input stream.
 type Decoder struct {
 	parser      *parser
@@ -159,18 +172,19 @@ func (n *Node) Decode(v interface{}) (err error) {
 }
 
 func unmarshal(in []byte, out interface{}, strict bool) (err error) {
-	return unmarshalWithParser(in, out, strict, false)
+	return unmarshalWithParser(in, out, strict, false, false)
 }
 
 func unmarshalLenient(in []byte, out interface{}, strict bool) (err error) {
-	return unmarshalWithParser(in, out, strict, true)
+	return unmarshalWithParser(in, out, strict, true, false)
 }
 
-func unmarshalWithParser(in []byte, out interface{}, strict, lenientAliases bool) (err error) {
+func unmarshalWithParser(in []byte, out interface{}, strict, lenientAliases, stubAliases bool) (err error) {
 	defer handleErr(&err)
 	d := newDecoder()
 	p := newParser(in)
 	p.lenientAliases = lenientAliases
+	p.stubAliases = stubAliases
 	defer p.destroy()
 	node := p.parse()
 	if node != nil {

@@ -37,6 +37,7 @@ type parser struct {
 	doneInit       bool
 	textless       bool
 	lenientAliases bool // if true, unknown anchors produce a null node instead of an error
+	stubAliases    bool // if true, all aliases are kept as AliasNode with nil Alias (never resolved)
 }
 
 func newParser(b []byte) *parser {
@@ -214,6 +215,12 @@ func (p *parser) document() *Node {
 
 func (p *parser) alias() *Node {
 	n := p.node(AliasNode, "", "", string(p.event.anchor))
+	if p.stubAliases {
+		// Keep the AliasNode as-is without resolving the Alias pointer.
+		// The encoder emits *anchorName using only node.Value, so Alias==nil is fine.
+		p.expect(yaml_ALIAS_EVENT)
+		return n
+	}
 	n.Alias = p.anchors[n.Value]
 	if n.Alias == nil {
 		if p.lenientAliases {
@@ -537,6 +544,10 @@ func (d *decoder) document(n *Node, out reflect.Value) (good bool) {
 }
 
 func (d *decoder) alias(n *Node, out reflect.Value) (good bool) {
+	if n.Alias == nil {
+		// Unresolved alias (stub mode or cross-file anchor): cannot decode into a value.
+		return false
+	}
 	if d.aliases[n] {
 		// TODO this could actually be allowed in some circumstances.
 		failf("anchor '%s' value contains itself", n.Value)

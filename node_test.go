@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"testing"
 
 	. "gopkg.in/check.v1"
 
@@ -2883,5 +2884,47 @@ func fprintComments(out io.Writer, node *yaml.Node, indent string) {
 func fprintCommentSet(out io.Writer, node *yaml.Node) {
 	if len(node.HeadComment)+len(node.LineComment)+len(node.FootComment) > 0 {
 		fmt.Fprintf(out, "%q / %q / %q", node.HeadComment, node.LineComment, node.FootComment)
+	}
+}
+
+// TestUnmarshalStubAliases verifies that UnmarshalStubAliases round-trips YAML
+// with cross-file anchor references (unknown anchors) without loss or error.
+// In-file anchors are also preserved as alias references rather than expanded.
+func TestUnmarshalStubAliases(t *testing.T) {
+	// Cross-file alias: *ext_anchor is never defined in this document.
+	const crossFile = "transform: *ext_anchor\nname: example\n"
+	var node yaml.Node
+	if err := yaml.UnmarshalStubAliases([]byte(crossFile), &node); err != nil {
+		t.Fatalf("UnmarshalStubAliases: %v", err)
+	}
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&node); err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "*ext_anchor") {
+		t.Errorf("encoded output missing *ext_anchor:\n%s", got)
+	}
+
+	// In-file anchor: *defaults should also survive as an alias (not expanded).
+	const inFile = "defaults: &defaults\n  timeout: 30\nconfig: *defaults\n"
+	var node2 yaml.Node
+	if err := yaml.UnmarshalStubAliases([]byte(inFile), &node2); err != nil {
+		t.Fatalf("UnmarshalStubAliases in-file: %v", err)
+	}
+	var buf2 bytes.Buffer
+	enc2 := yaml.NewEncoder(&buf2)
+	enc2.SetIndent(2)
+	if err := enc2.Encode(&node2); err != nil {
+		t.Fatalf("Encode in-file: %v", err)
+	}
+	got2 := buf2.String()
+	if !strings.Contains(got2, "*defaults") {
+		t.Errorf("encoded output missing *defaults:\n%s", got2)
+	}
+	if !strings.Contains(got2, "&defaults") {
+		t.Errorf("encoded output missing &defaults:\n%s", got2)
 	}
 }
